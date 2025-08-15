@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>Cookie Chomp Tycoon</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0b0f14">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+
+<style>
+  :root{
+    --bg:#0b0f14; --ink:#e7f2ff; --muted:#9fb3c8; --acc1:#7ef2c4; --acc2:#ffd884;
+    --gold:#ffd76d; --chip:#6b3a1e; --cookie:#b3733a; --edge:#0a0e13;
+  }
+  html,body{height:100%}
+  body{margin:0;background:#0b0f14;color:var(--ink);font-family:'Press Start 2P',monospace;image-rendering:pixelated;overflow:hidden}
+  .wrap{height:100%;display:grid;grid-template-rows:auto 1fr auto}
+  header{padding:10px 12px;background:#0f1520;border-bottom:2px solid var(--edge);display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+  .left,.right{display:flex;gap:12px;align-items:center}
+  .stat{font-size:12px;color:var(--muted)} .stat b{color:var(--ink)}
+  .btn{font-size:11px;padding:8px 10px;border:0;background:linear-gradient(#ffd884,#ffcf70);box-shadow:0 3px 0 #c19432;color:#0b0f14;cursor:pointer}
+  .btn.tiny{font-size:10px;padding:6px 8px}
+  .muted{opacity:.6}
+
+  /* ---------- Parallax world ---------- */
+  .world{position:relative;overflow:hidden;isolation:isolate}
+  .layer{position:absolute;inset:0;pointer-events:none}
+  /* back sky */
+  .sky{background:linear-gradient(#9dc6ff,#f6dcb5)}
+  .clouds::before,.clouds::after{
+    content:""; position:absolute; left:-40%; top:20%; width:200%; height:60%;
+    background:
+      radial-gradient(circle at 10% 40%, #fff8 0 8%, transparent 9%),
+      radial-gradient(circle at 40% 30%, #fff8 0 7%, transparent 8%),
+      radial-gradient(circle at 70% 50%, #fff8 0 9%, transparent 10%),
+      radial-gradient(circle at 90% 40%, #fff8 0 6%, transparent 7%);
+    animation:clouds 80s linear infinite;
+    opacity:.45
+  }
+  .clouds::after{ top:35%; animation-duration:110s; opacity:.35 }
+  @keyframes clouds { to{ transform:translateX(40%) } }
+
+  /* mid kitchen tiles */
+  .tiles{opacity:.12}
+  .tiles::before{
+    content:"";position:absolute;inset:0;
+    background:
+      repeating-linear-gradient(90deg,#000 0 1px,transparent 1px 64px),
+      repeating-linear-gradient(0deg,#000 0 1px,transparent 1px 64px);
+    transform:translateY(162px);mix-blend-mode:soft-light;
+  }
+  /* counter (foreground) */
+  .counter{position:absolute;left:0;right:0;bottom:0;height:70px;background:#1a2330;border-top:2px solid #0a0e13;box-shadow:0 -3px 0 #0006 inset; opacity:.9}
+
+  /* shelf props */
+  .shelf{position:absolute;left:50%;top:130px;transform:translateX(-50%);width:min(90vw,700px);height:10px;
+         background:#8b5a2b; box-shadow:0 3px 0 #5a3b1c}
+  .jar,.milk,.cookieJar{position:absolute;bottom:10px;image-rendering:pixelated}
+  .jar{width:26px;height:32px;background:#d9edf6;border:2px solid #7aa0b8;left:10%}
+  .jar:after{content:"";position:absolute;top:-8px;left:4px;width:18px;height:8px;background:#b76434;border:2px solid #7a3b1e}
+  .milk{width:28px;height:34px;background:linear-gradient(#ffffff,#cde8ff);border:2px solid #7aa0b8;left:22%}
+  .cookieJar{width:30px;height:34px;background:#f0bb7c;border:2px solid #8a5b2a;left:36%}
+  .cookieJar:after{content:"";position:absolute;top:-10px;left:6px;width:16px;height:10px;background:#b5793d;border:2px solid #7a4a22;transform-origin:left bottom}
+  .pop .cookieJar:after{animation:lid 1s steps(3) 1}
+  @keyframes lid{0%{transform:rotate(0)}40%{transform:rotate(-30deg)}100%{transform:rotate(0)}}
+
+  /* Monster */
+  .monsterWrap{position:absolute;inset:0;display:grid;place-items:end center;padding-bottom:26px}
+  svg{width:min(92vw,720px);height:auto;image-rendering:pixelated}
+  .hint{position:absolute;top:74px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--muted);opacity:.9;transition:opacity .4s}
+  .hint.off{opacity:0}
+  .bob{animation:bob 2.2s ease-in-out infinite}
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+
+  /* Drops & particles */
+  .drop{position:absolute;width:28px;height:28px;cursor:pointer;image-rendering:pixelated;
+        background:radial-gradient(circle at 50% 40%,#d39c64 0 8px,#b3733a 9px), var(--cookie);
+        border:2px solid #6b3a1e; box-shadow:0 2px 0 #0007; border-radius:4px;}
+  .float{position:absolute;font-size:12px;color:var(--gold);text-shadow:0 2px 0 #000;pointer-events:none}
+  .crumb{position:absolute;width:6px;height:6px;background:var(--cookie);box-shadow:2px 2px 0 #0006;pointer-events:none}
+
+  /* Icon shop */
+  .shop{display:flex;gap:14px;align-items:center;justify-content:center;background:#0f1520;border-top:2px solid var(--edge);padding:10px 12px;flex-wrap:wrap}
+  .tile{display:flex;flex-direction:column;align-items:center}
+  .iconBtn{--A:#7ef2c4; --B:#56d6ac; --S:#2b8b73; padding:10px;border:0;box-shadow:0 3px 0 var(--S);background:linear-gradient(var(--A),var(--B));cursor:pointer;image-rendering:pixelated}
+  .iconBtn.alt{--A:#ffd884;--B:#ffcf70;--S:#c19432}
+  .iconBtn.danger{--A:#ff958f;--B:#ff6b64;--S:#a33c36}
+  .iconBtn.locked{filter:grayscale(90%);opacity:.6;cursor:not-allowed}
+  .iconBtn svg{width:28px;height:28px;display:block}
+  .under{font-size:10px;color:var(--muted);text-align:center;margin-top:6px}
+
+  /* Toasts / Achievements */
+  .toast{position:fixed;left:50%;top:74px;transform:translateX(-50%);background:#0f1520;border:2px solid #0a0e13;padding:6px 10px;font-size:11px}
+  .badge{display:inline-block;margin-right:6px}
+
+  @media (max-width:420px){ .stat b{display:inline-block;min-width:64px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="left">
+      <div class="stat">🍪 Crumbs: <b id="crumbs">0</b></div>
+      <div class="stat">CPS: <b id="cps">0</b></div>
+      <div class="stat">×<b id="mult">1</b></div>
+    </div>
+    <div class="right">
+      <button id="muteBtn" class="btn tiny">🔊</button>
+      <button id="installBtn" class="btn tiny">Install</button>
+    </div>
+  </header>
+
+  <div class="world" id="world">
+    <!-- Parallax layers -->
+    <div class="layer sky"></div>
+    <div class="layer clouds"></div>
+    <div class="layer tiles"></div>
+    <div class="shelf pop"><div class="jar"></div><div class="milk"></div><div class="cookieJar"></div></div>
+
+    <div class="hint" id="hint">Tap the Monster to CHOMP!</div>
+
+    <div class="monsterWrap bob">
+      <!-- Big blue pixel monster (original character) -->
+      <svg id="monster" viewBox="0 0 128 128" tabindex="0" role="button" aria-label="Tap to chomp">
+        <g id="g-body">
+          <rect x="12" y="40" width="104" height="76" fill="#1676a5" />
+          <rect x="20" y="28" width="88" height="24" fill="#1676a5" />
+          <rect x="20" y="44" width="20" height="12" fill="#14658e" />
+          <rect x="40" y="60" width="16" height="10" fill="#14658e" />
+          <rect x="84" y="68" width="18" height="12" fill="#14658e" />
+          <rect x="4"  y="64" width="20" height="20" fill="#1676a5" />
+          <rect x="104" y="64" width="20" height="20" fill="#1676a5" />
+        </g>
+        <g id="g-head">
+          <rect x="24" y="10" width="80" height="26" fill="#1676a5"/>
+          <rect x="18" y="8" width="10" height="6" fill="#1676a5"/>
+          <rect x="32" y="6" width="10" height="6" fill="#1676a5"/>
+          <rect x="88" y="6" width="10" height="6" fill="#1676a5"/>
+          <rect x="100" y="8" width="10" height="6" fill="#1676a5"/>
+          <rect x="34" y="10" width="16" height="12" fill="#f5f7ff"/>
+          <rect x="78" y="10" width="16" height="12" fill="#f5f7ff"/>
+          <rect x="44" y="16" width="6" height="6" fill="#121214"/>
+          <rect x="84" y="16" width="6" height="6" fill="#121214"/>
+          <rect id="mouth" x="36" y="26" width="56" height="12" fill="#0a0a0c"/>
+        </g>
+        <g id="g-cookie">
+          <rect x="24" y="86" width="20" height="16" fill="#b3733a"></rect>
+          <rect x="28" y="88" width="4" height="4" fill="#6b3a1e"></rect>
+          <rect x="36" y="94" width="4" height="4" fill="#6b3a1e"></rect>
+          <rect x="32" y="90" width="4" height="4" fill="#6b3a1e"></rect>
+        </g>
+      </svg>
+    </div>
+
+    <div class="counter layer"></div>
+  </div>
+
+  <!-- Icon shop -->
+  <div class="shop">
+    <div class="tile">
+      <button class="iconBtn" id="autoBtn" title="Auto‑Plate: +0.5 cps">
+        <svg viewBox="0 0 24 24"><rect x="1" y="10" width="22" height="6" fill="#9fe7d0" /><rect x="3" y="12" width="18" height="2" fill="#5dc5a4" /></svg>
+      </button>
+      <div class="under">x<span id="autoCount">0</span> • <span id="autoCost">15</span></div>
+    </div>
+    <div class="tile">
+      <button class="iconBtn" id="ovenBtn" title="Oven: +2 cps">
+        <svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" fill="#b3d1d9"/><rect x="5" y="8" width="14" height="9" fill="#23424c"/><rect x="7" y="6" width="10" height="2" fill="#7aa0b8"/></svg>
+      </button>
+      <div class="under">x<span id="ovenCount">0</span> • <span id="ovenCost">80</span></div>
+    </div>
+    <div class="tile">
+      <button class="iconBtn alt" id="dunkBtn" title="Double Dunk: x2 for 10s">
+        <svg viewBox="0 0 24 24"><rect x="7" y="4" width="10" height="16" fill="#e7f2ff"/><rect x="7" y="4" width="10" height="3" fill="#cde8ff"/></svg>
+      </button>
+      <div class="under" id="dunkUnder"><span id="dunkCost">60</span></div>
+    </div>
+    <div class="tile">
+      <button class="iconBtn danger" id="stormBtn" title="Chip Storm: +4 click for 8s">
+        <svg viewBox="0 0 24 24"><polygon points="10,2 5,12 11,12 7,22 19,9 12,9 17,2" fill="#ffb199"/></svg>
+      </button>
+      <div class="under" id="stormUnder"><span id="stormCost">90</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------------- Core State ---------------- */
+const S = { crumbs:0, cps:0, mult:1, bonusClick:0, auto:0, oven:0,
+  costs:{auto:15, oven:80, dunk:60, storm:90}, dunkCD:0, stormCD:0,
+  clicks:0, muted:false };
+const $=s=>document.querySelector(s);
+
+const world=$('#world'), monster=$('#monster'), mouth=$('#mouth'), gCookie=$('#g-cookie');
+const crumbsEl=$('#crumbs'), cpsEl=$('#cps'), multEl=$('#mult'), hint=$('#hint');
+const autoBtn=$('#autoBtn'), ovenBtn=$('#ovenBtn'), dunkBtn=$('#dunkBtn'), stormBtn=$('#stormBtn');
+const autoCount=$('#autoCount'), ovenCount=$('#ovenCount'), autoCost=$('#autoCost'), ovenCost=$('#ovenCost');
+const dunkUnder=$('#dunkUnder'), stormUnder=$('#stormUnder');
+const muteBtn=$('#muteBtn'), installBtn=$('#installBtn');
+
+/* --------- Save / Load --------- */
+try{ const save=JSON.parse(localStorage.getItem('cct_stage2_v1')||"null"); if(save) Object.assign(S, save);}catch(e){}
+function save(){ localStorage.setItem('cct_stage2_v1', JSON.stringify(S)); }
+
+/* --------- UI --------- */
+function lock(btn,cond){ btn.classList.toggle('locked',cond); btn.disabled=cond; }
+function ui(){
+  crumbsEl.textContent = Math.floor(S.crumbs);
+  cpsEl.textContent = S.cps.toFixed(1);
+  multEl.textContent = S.mult.toFixed(1).replace(/\.0$/,'');
+  autoCount.textContent = S.auto; ovenCount.textContent = S.oven;
+  autoCost.textContent  = S.costs.auto; ovenCost.textContent = S.costs.oven;
+  dunkUnder.textContent  = S.dunkCD>0 ? Math.ceil(S.dunkCD)+'s' : S.costs.dunk;
+  stormUnder.textContent = S.stormCD>0 ? Math.ceil(S.stormCD)+'s' : S.costs.storm;
+  lock(autoBtn,  S.crumbs < S.costs.auto);
+  lock(ovenBtn,  S.crumbs < S.costs.oven);
+  lock(dunkBtn,  S.crumbs < S.costs.dunk || S.dunkCD>0);
+  lock(stormBtn, S.crumbs < S.costs.storm || S.stormCD>0);
+  muteBtn.textContent = S.muted ? '🔇' : '🔊';
+}
+ui();
+
+/* --------- Audio --------- */
+let audioCtx;
+function blip(freq=660){
+  if(S.muted) return;
+  try{
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.type='square'; o.frequency.value=freq; g.gain.value=0.03; o.connect(g); g.connect(audioCtx.destination); o.start();
+    setTimeout(()=>{ g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime+0.08); o.stop(audioCtx.currentTime+0.09); }, 0);
+  }catch(e){}
+}
+muteBtn.addEventListener('click', ()=>{ S.muted=!S.muted; ui(); save(); toast(S.muted?'Sound off':'Sound on'); });
+
+/* --------- FX --------- */
+function floatText(txt,x,y){
+  const d=document.createElement('div'); d.className='float'; d.textContent=txt;
+  d.style.left=(x-10)+'px'; d.style.top=(y-10)+'px'; world.appendChild(d);
+  const s=performance.now();
+  (function step(t){const k=Math.min(1,(t-s)/800); d.style.transform=`translateY(${-40*k}px)`; d.style.opacity=(1-k); if(k<1) requestAnimationFrame(step); else d.remove();})(s);
+}
+function crumbsBurst(x,y){
+  for(let i=0;i<8;i++){
+    const c=document.createElement('div'); c.className='crumb'; c.style.left=x+'px'; c.style.top=y+'px'; world.appendChild(c);
+    const ang=Math.random()*Math.PI*2, sp=40+Math.random()*70; const s=performance.now();
+    (function step(t){const k=Math.min(1,(t-s)/700); const dx=Math.cos(ang)*sp*k; const dy=Math.sin(ang)*sp*k + 40*k*k;
+      c.style.transform=`translate(${dx}px,${dy}px)`; c.style.opacity=(1-k); if(k<1) requestAnimationFrame(step); else c.remove();})(s);
+  }
+}
+function toast(msg, badge='🏆'){
+  const t=document.createElement('div'); t.className='toast';
+  t.innerHTML = `<span class="badge">${badge}</span>${msg}`;
+  document.body.appendChild(t); setTimeout(()=>t.remove(),1800);
+}
+
+/* --------- Chomp --------- */
+let first=false, chompLock=false;
+function chomp(x,y){
+  if(chompLock) return; chompLock=true;
+  if(!first){ hint.classList.add('off'); first=true; }
+  const gain = Math.round((1 + S.bonusClick) * S.mult);
+  S.crumbs += gain; S.clicks++;
+  mouth.setAttribute('height', 24);
+  gCookie.style.transition='transform .18s steps(3,end)'; gCookie.style.transformOrigin='50% 50%'; gCookie.style.transform='translate(28px,-48px)';
+  floatText('+'+gain, x, y); crumbsBurst(x,y); blip();
+  checkAch();
+  setTimeout(()=>{ mouth.setAttribute('height', 12); gCookie.style.transform='translate(0,0)'; chompLock=false; }, 180);
+  ui(); save();
+}
+monster.addEventListener('pointerdown', e=>chomp(e.clientX, e.clientY));
+window.addEventListener('keydown', e=>{ if(e.code==='Space'||e.code==='Enter'){ const r=world.getBoundingClientRect(); chomp(r.left+r.width*.5, r.top+r.height*.6); }});
+
+/* --------- Shop --------- */
+function recalc(){ S.cps = S.auto*.5 + S.oven*2; }
+autoBtn.addEventListener('click', ()=>{ if(S.crumbs>=S.costs.auto){ S.crumbs-=S.costs.auto; S.auto++; S.costs.auto=Math.ceil(S.costs.auto*1.6); recalc(); toast('Auto‑Plate +0.5 cps','🍽️'); ui(); save(); }});
+ovenBtn.addEventListener('click', ()=>{ if(S.crumbs>=S.costs.oven){ S.crumbs-=S.costs.oven; S.oven++; S.costs.oven=Math.ceil(S.costs.oven*1.7); recalc(); toast('Oven +2 cps','🔥'); ui(); save(); }});
+dunkBtn.addEventListener('click', ()=>{ if(S.crumbs>=S.costs.dunk && S.dunkCD<=0){ S.crumbs-=S.costs.dunk; S.mult*=2; S.dunkCD=30; toast('Double Dunk ×2 (10s)','🥛'); setTimeout(()=>{S.mult/=2; toast('Double Dunk ended','⏱️'); ui();},10000); ui(); save(); }});
+stormBtn.addEventListener('click', ()=>{ if(S.crumbs>=S.costs.storm && S.stormCD<=0){ S.crumbs-=S.costs.storm; S.bonusClick+=4; S.stormCD=35; toast('Chip Storm +4 click (8s)','⚡'); setTimeout(()=>{S.bonusClick-=4; toast('Chip Storm ended','⏱️'); ui();},8000); ui(); save(); }});
+
+/* --------- Idle + Events --------- */
+recalc(); ui();
+let last=performance.now(), rainTimer=10;
+function loop(now){
+  const dt=(now-last)/1000; last=now;
+  if(S.cps>0) S.crumbs += S.cps*dt;
+  if(S.dunkCD>0)  S.dunkCD=Math.max(0,S.dunkCD-dt);
+  if(S.stormCD>0) S.stormCD=Math.max(0,S.stormCD-dt);
+  if(Math.random()<0.002) document.querySelector('.shelf').classList.add('pop'), setTimeout(()=>document.querySelector('.shelf').classList.remove('pop'), 900);
+  rainTimer -= dt; if(rainTimer<=0){ cookieRain(); rainTimer = 40 + Math.random()*20; }
+  crumbsEl.textContent = Math.floor(S.crumbs); cpsEl.textContent = S.cps.toFixed(1);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+function cookieRain(){
+  toast('Cookie Rain! Tap falling cookies!','🍪');
+  const duration=9, start=performance.now();
+  (function spawn(){ if(performance.now()-start>duration*1000) return; drop(); setTimeout(spawn,280); })();
+}
+function drop(){
+  const d=document.createElement('div'); d.className='drop';
+  const a=world.getBoundingClientRect(); const x=20+Math.random()*(a.width-40); d.style.left=x+'px'; d.style.top='-30px';
+  world.appendChild(d);
+  const fall=a.height+40, speed=90+Math.random()*60, born=performance.now();
+  function step(t){ const k=(t-born)/1000; d.style.transform=`translateY(${k*speed}px)`; if(k*speed>fall){ d.remove(); return; } requestAnimationFrame(step); }
+  requestAnimationFrame(step);
+  d.addEventListener('pointerdown', e=>{ e.stopPropagation(); const add=Math.round(5*S.mult); S.crumbs+=add; floatText('+'+add, e.clientX, e.clientY); blip(880); d.remove(); ui(); save(); });
+}
+
+/* --------- Achievements --------- */
+const Ach = {
+  firstChomp:false, clicks100:false, crumbs1k:false, firstBuy:false, firstRain:false
+};
+function checkAch(){
+  if(!Ach.firstChomp){ Ach.firstChomp=true; toast('First Chomp!','🎉'); }
+  if(!Ach.clicks100 && S.clicks>=100){ Ach.clicks100=true; toast('100 Clicks!','💪'); }
+  if(!Ach.crumbs1k && S.crumbs>=1000){ Ach.crumbs1k=true; toast('1,000 Crumbs!','💰'); }
+}
+
+/* --------- PWA: install prompt + SW --------- */
+let deferredPrompt=null;
+window.addEventListener('beforeinstallprompt', (e)=>{ e.preventDefault(); deferredPrompt=e; installBtn.disabled=false; });
+installBtn.addEventListener('click', async ()=>{ if(!deferredPrompt) return toast('Install not available yet','ℹ️'); deferredPrompt.prompt(); const {outcome}=await deferredPrompt.userChoice; toast(outcome==='accepted'?'Installing…':'Install dismissed','📲'); deferredPrompt=null; });
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('./sw.js'); }
+</script>
+</body>
+</html>
+
+
+
+
+sw.js (service worker) 
+
+const CACHE = 'cookie-chomp-v1';
+const ASSETS = [
+  './',
+  './index.html',
+  './manifest.json',
+  './icons/icon-192.png',
+  './icons/icon-512.png'
+];
+
+self.addEventListener('install', (e) => {
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (e) => {
+  e.waitUntil(
+    caches.keys().then(keys => Promise.all(keys.map(k => k!==CACHE && caches.delete(k))))
+  );
+  self.clients.claim();
+});
+
+self.addEventListener('fetch', (e) => {
+  const req = e.request;
+  e.respondWith(
+    caches.match(req).then(res => res || fetch(req).then(net => {
+      // cache new GET requests
+      if(req.method === 'GET' && net.status === 200 && net.type === 'basic'){
+        const clone = net.clone();
+        caches.open(CACHE).then(c => c.put(req, clone));
+      }
+      return net;
+    }).catch(()=> caches.match('./index.html')))
+  );
+});
